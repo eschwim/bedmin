@@ -1,7 +1,6 @@
 """minectl: Minecraft Bedrock server manager CLI."""
 
 import json
-import logging
 import os
 import re
 import sys
@@ -87,7 +86,9 @@ def server() -> None:
 @click.option("--version", "version_pin", default=None, help="Pin to a specific version (default: latest).")
 @click.option("--url", "direct_url", default=None, help="Direct download URL (skips Mojang page scrape).")
 @click.option("--path", "install_path", default=None, help="Install directory (default: ~/mc-servers/<name>).")
-def server_create(name: str, port: int, version_pin: str | None, direct_url: str | None, install_path: str | None) -> None:
+def server_create(
+    name: str, port: int, version_pin: str | None, direct_url: str | None, install_path: str | None
+) -> None:
     """Download and create a new server instance."""
     reg = _registry()
     if reg.get_server(name):
@@ -735,8 +736,9 @@ def daemon_start() -> None:
 @daemon.command("stop")
 def daemon_stop() -> None:
     """Stop the scheduler daemon."""
-    from src.scheduler import get_daemon_pid
     import signal as _signal
+
+    from src.scheduler import get_daemon_pid
 
     pid = get_daemon_pid()
     if pid is None:
@@ -847,8 +849,8 @@ WantedBy=default.target
         _info("  Check status: systemctl --user status minectl")
         _info("  View logs:    journalctl --user -u minectl -f")
     else:
-        _info(f"\nTo start now:  systemctl --user start minectl")
-        _info(f"To view logs:  journalctl --user -u minectl -f")
+        _info("\nTo start now:  systemctl --user start minectl")
+        _info("To view logs:  journalctl --user -u minectl -f")
 
 
 @daemon.command("uninstall")

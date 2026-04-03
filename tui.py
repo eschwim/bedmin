@@ -4,32 +4,25 @@ from __future__ import annotations
 
 # Suppress tqdm output before importing modules that use it (tqdm respects this env var)
 import os
+
 os.environ["TQDM_DISABLE"] = "1"
 
 # Suppress internal logging so it doesn't corrupt the terminal
 import logging
+
 logging.disable(logging.CRITICAL)
 
+import contextlib
 import re
 import subprocess
-import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
-
-import config
-from src.backup_manager import BackupManager
-from src.downloader import BedrockDownloader
-from src.player_manager import PlayerManager
-from src import ipc
-from src.process_manager import ProcessManager
-from src.registry import ServerRegistry
-from src.server_instance import ServerInstance
 
 from textual import on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Horizontal, ScrollableContainer, Vertical
+from textual.coordinate import Coordinate
 from textual.css.query import NoMatches
 from textual.reactive import reactive
 from textual.screen import ModalScreen
@@ -48,6 +41,15 @@ from textual.widgets import (
     TabbedContent,
     TabPane,
 )
+
+import config
+from src import ipc
+from src.backup_manager import BackupManager
+from src.downloader import BedrockDownloader
+from src.player_manager import PlayerManager
+from src.process_manager import ProcessManager
+from src.registry import ServerRegistry
+from src.server_instance import ServerInstance
 
 # ---------------------------------------------------------------------------
 # Shared stateless manager singletons
@@ -191,7 +193,7 @@ class IntegerEditModal(ModalScreen):
     BINDINGS = [Binding("escape", "dismiss_cancel", "Cancel")]
 
     def __init__(self, key: str, value: str,
-                 min_val: Optional[int], max_val: Optional[int]) -> None:
+                 min_val: int | None, max_val: int | None) -> None:
         super().__init__()
         self._key = key
         self._value = value
@@ -227,9 +229,7 @@ class IntegerEditModal(ModalScreen):
             return False
         if self._min is not None and v < self._min:
             return False
-        if self._max is not None and v > self._max:
-            return False
-        return True
+        return not (self._max is not None and v > self._max)
 
     @on(Button.Pressed, "#modal-ok")
     def handle_ok(self) -> None:
@@ -437,7 +437,7 @@ class LogsTab(Widget):
     def __init__(self, server: ServerInstance) -> None:
         super().__init__()
         self.server = server
-        self._tail_proc: Optional[subprocess.Popen] = None
+        self._tail_proc: subprocess.Popen | None = None
 
     def compose(self) -> ComposeResult:
         yield RichLog(id="log-view", highlight=False, markup=True, wrap=True)
@@ -448,10 +448,8 @@ class LogsTab(Widget):
 
     def on_unmount(self) -> None:
         if self._tail_proc:
-            try:
+            with contextlib.suppress(OSError):
                 self._tail_proc.terminate()
-            except OSError:
-                pass
 
     def _seed_history(self) -> None:
         if not self.server.log_file.exists():
@@ -475,6 +473,7 @@ class LogsTab(Widget):
             text=True,
         )
         self._tail_proc = proc
+        assert proc.stdout is not None
         try:
             for raw_line in proc.stdout:
                 if not self.is_attached:
@@ -484,14 +483,13 @@ class LogsTab(Widget):
         except (OSError, ValueError):
             pass
         finally:
-            try:
+            with contextlib.suppress(OSError):
                 proc.terminate()
-            except OSError:
-                pass
 
     @staticmethod
     def _markup(line: str) -> str:
         import re
+
         from rich.markup import escape
         safe = escape(line)
         if re.search(r"\[ERROR\]", line, re.IGNORECASE):
@@ -528,10 +526,8 @@ class PlayersTab(Widget):
     def refresh_data(self) -> None:
         online = _plm.get_online_players(self.server)
         text = ", ".join(online) if online else "[dim]None[/]"
-        try:
+        with contextlib.suppress(NoMatches):
             self.query_one("#online-list", Label).update(text)
-        except NoMatches:
-            pass
 
         table = self.query_one("#whitelist-table", DataTable)
         table.clear()
@@ -576,7 +572,7 @@ class BackupsTab(Widget):
             )
             self._backup_paths.append(b["path"])
 
-    def get_selected_backup_path(self) -> Optional[str]:
+    def get_selected_backup_path(self) -> str | None:
         table = self.query_one(DataTable)
         row = table.cursor_row
         if row < 0 or row >= len(self._backup_paths):
@@ -668,8 +664,9 @@ class PropertiesTab(Widget):
                 return {"integer": True, "min": int(m.group(1)), "max": int(m.group(2))}
 
             # Integer with lower bound only
-            if re.search(r'positive integer equal to (\d+) or greater', rest_lower):
-                n = int(re.search(r'(\d+)', rest_lower).group(1))
+            m_lb = re.search(r'positive integer equal to (\d+) or greater', rest_lower)
+            if m_lb:
+                n = int(m_lb.group(1))
                 return {"integer": True, "min": n, "max": None}
             if "positive integer" in rest_lower or "any positive integer" in rest_lower:
                 return {"integer": True, "min": 1, "max": None}
@@ -715,15 +712,13 @@ class PropertiesTab(Widget):
             screen = EditValueModal(key, value)
         self.app.push_screen(screen, callback=lambda v: self._apply_edit(row, v))
 
-    def _apply_edit(self, row: int, new_value: Optional[str]) -> None:
+    def _apply_edit(self, row: int, new_value: str | None) -> None:
         if new_value is None:
             return
         key, _, constraints = self._props[row]
         self._props[row] = (key, new_value, constraints)
-        try:
-            self.query_one("#props-table", DataTable).update_cell_at((row, 1), new_value)
-        except Exception:
-            pass
+        with contextlib.suppress(Exception):
+            self.query_one("#props-table", DataTable).update_cell_at(Coordinate(row, 1), new_value)
 
 
 # ---------------------------------------------------------------------------
@@ -733,7 +728,7 @@ class PropertiesTab(Widget):
 class ServerPanel(Widget):
     """Right pane: tabbed content for the currently selected server."""
 
-    server: reactive[Optional[ServerInstance]] = reactive(None, recompose=True)
+    server: reactive[ServerInstance | None] = reactive(None, recompose=True)
 
     def compose(self) -> ComposeResult:
         if self.server is None:
@@ -758,10 +753,8 @@ class ServerPanel(Widget):
 
     def poll_status(self) -> None:
         """Called by the app-level timer every 2 seconds."""
-        try:
+        with contextlib.suppress(NoMatches):
             self.query_one(OverviewTab).refresh_status()
-        except NoMatches:
-            pass
 
     # --- Button handlers (events bubble up from child tabs) ---
 
@@ -804,9 +797,15 @@ class ServerPanel(Widget):
         except NoMatches:
             return
         if path:
+            server, dest = self.server, Path(path)
+
+            def _on_restore_confirmed(ok: bool | None) -> None:
+                if ok:
+                    self._do_restore(server, dest)
+
             self.app.push_screen(
-                ConfirmModal(f"Restore [bold]{Path(path).name}[/]?\nThis will overwrite current world data."),
-                callback=lambda ok: self._do_restore(self.server, Path(path)) if ok else None,
+                ConfirmModal(f"Restore [bold]{dest.name}[/]?\nThis will overwrite current world data."),
+                callback=_on_restore_confirmed,
             )
 
     @on(Button.Pressed, "#btn-backup-delete")
@@ -818,17 +817,21 @@ class ServerPanel(Widget):
         except NoMatches:
             return
         if path:
+            server, dest = self.server, Path(path)
+
+            def _on_delete_confirmed(ok: bool | None) -> None:
+                if ok:
+                    self._do_delete_backup(server, dest)
+
             self.app.push_screen(
-                ConfirmModal(f"Delete [bold]{Path(path).name}[/]?"),
-                callback=lambda ok: self._do_delete_backup(self.server, Path(path)) if ok else None,
+                ConfirmModal(f"Delete [bold]{dest.name}[/]?"),
+                callback=_on_delete_confirmed,
             )
 
     @on(Button.Pressed, "#btn-backup-refresh")
     def handle_backup_refresh(self) -> None:
-        try:
+        with contextlib.suppress(NoMatches):
             self.query_one(BackupsTab).refresh_data()
-        except NoMatches:
-            pass
 
     @on(Button.Pressed, "#btn-wl-add")
     def handle_wl_add(self) -> None:
@@ -847,9 +850,9 @@ class ServerPanel(Widget):
             table = self.query_one("#whitelist-table", DataTable)
             row = table.cursor_row
             # Get name from first column of selected row
-            name = str(table.get_cell_at((row, 0))) if row >= 0 else ""
+            str(table.get_cell_at(Coordinate(row, 0))) if row >= 0 else ""
         except (NoMatches, Exception):
-            name = ""
+            pass
         self.app.push_screen(
             PlayerInputModal("Remove from Whitelist", ["Player name"]),
             callback=self._on_wl_remove_result,
@@ -857,10 +860,8 @@ class ServerPanel(Widget):
 
     @on(Button.Pressed, "#btn-players-refresh")
     def handle_players_refresh(self) -> None:
-        try:
+        with contextlib.suppress(NoMatches):
             self.query_one(PlayersTab).refresh_data()
-        except NoMatches:
-            pass
 
     @on(Button.Pressed, "#btn-props-save")
     def handle_props_save(self) -> None:
@@ -872,12 +873,10 @@ class ServerPanel(Widget):
 
     @on(Button.Pressed, "#btn-props-reload")
     def handle_props_reload(self) -> None:
-        try:
+        with contextlib.suppress(NoMatches):
             self.query_one(PropertiesTab).load_props()
-        except NoMatches:
-            pass
 
-    def _on_wl_add_result(self, result: Optional[list[str]]) -> None:
+    def _on_wl_add_result(self, result: list[str] | None) -> None:
         if result is None or self.server is None:
             return
         name = result[0].strip() if result else ""
@@ -885,7 +884,7 @@ class ServerPanel(Widget):
         if name:
             self._do_wl_add(self.server, name, xuid)
 
-    def _on_wl_remove_result(self, result: Optional[list[str]]) -> None:
+    def _on_wl_remove_result(self, result: list[str] | None) -> None:
         if result is None or self.server is None:
             return
         name = result[0].strip() if result else ""
@@ -970,10 +969,8 @@ class ServerPanel(Widget):
                 self.app.notify, str(exc), title="Backup Failed", severity="error"
             )
         finally:
-            try:
+            with contextlib.suppress(NoMatches):
                 self.app.call_from_thread(self.query_one(BackupsTab).refresh_data)
-            except NoMatches:
-                pass
 
     @work(thread=True, group="backup-ops")
     def _do_restore(self, server: ServerInstance, backup_path: Path) -> None:
@@ -1007,10 +1004,8 @@ class ServerPanel(Widget):
                 self.app.notify, str(exc), title="Delete Failed", severity="error"
             )
         finally:
-            try:
+            with contextlib.suppress(NoMatches):
                 self.app.call_from_thread(self.query_one(BackupsTab).refresh_data)
-            except NoMatches:
-                pass
 
     @work(thread=True)
     def _do_wl_add(self, server: ServerInstance, name: str, xuid: str) -> None:
@@ -1024,10 +1019,8 @@ class ServerPanel(Widget):
                 self.app.notify, str(exc), title="Whitelist Error", severity="error"
             )
         finally:
-            try:
+            with contextlib.suppress(NoMatches):
                 self.app.call_from_thread(self.query_one(PlayersTab).refresh_data)
-            except NoMatches:
-                pass
 
     @work(thread=True)
     def _do_wl_remove(self, server: ServerInstance, name: str) -> None:
@@ -1041,10 +1034,8 @@ class ServerPanel(Widget):
                 self.app.notify, str(exc), title="Whitelist Error", severity="error"
             )
         finally:
-            try:
+            with contextlib.suppress(NoMatches):
                 self.app.call_from_thread(self.query_one(PlayersTab).refresh_data)
-            except NoMatches:
-                pass
 
 
 # ---------------------------------------------------------------------------
@@ -1373,7 +1364,7 @@ PlayerInputModal, ConfirmModal {
     def action_new_server(self) -> None:
         self.push_screen(CreateServerModal(), callback=self._on_create_result)
 
-    def _on_create_result(self, result: Optional[tuple]) -> None:
+    def _on_create_result(self, result: tuple | None) -> None:
         if result:
             name, port = result
             self._do_create_server(name, port)

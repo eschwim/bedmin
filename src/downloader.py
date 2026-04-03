@@ -1,12 +1,10 @@
 """BedrockDownloader: scrapes Mojang's download page and installs the server binary."""
 
 import logging
-import os
 import re
 import stat
 import zipfile
 from pathlib import Path
-from typing import Optional, Tuple
 
 import requests
 from tqdm import tqdm
@@ -38,7 +36,7 @@ class BedrockDownloader:
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         })
 
-    def get_latest_version_url(self) -> Tuple[str, str]:
+    def get_latest_version_url(self) -> tuple[str, str]:
         """
         Return (version, download_url) for the latest Bedrock Dedicated Server.
         Primary source: Minecraft Wiki API (reliable, no JS rendering required).
@@ -50,7 +48,7 @@ class BedrockDownloader:
             logger.warning("Wiki API failed (%s), falling back to Mojang page...", exc)
             return self._version_from_mojang_page()
 
-    def _version_from_wiki(self) -> Tuple[str, str]:
+    def _version_from_wiki(self) -> tuple[str, str]:
         """Query the Minecraft Wiki MediaWiki API for the latest Linux server URL."""
         logger.info("Fetching latest Bedrock server version from Minecraft Wiki...")
         # Use a plain session for the wiki — browser-spoofing headers cause 403 there
@@ -81,9 +79,10 @@ class BedrockDownloader:
         logger.info("Latest version (from wiki): %s", latest)
         return latest, url
 
-    def _version_from_mojang_page(self) -> Tuple[str, str]:
+    def _version_from_mojang_page(self) -> tuple[str, str]:
         """Scrape the Mojang download page for the latest Linux server URL."""
         logger.info("Fetching latest Bedrock server version from Mojang page...")
+        resp: requests.Response | None = None
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 resp = self._session.get(MOJANG_DOWNLOAD_PAGE, timeout=REQUEST_TIMEOUT)
@@ -98,9 +97,12 @@ class BedrockDownloader:
                         "--url https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-X.Y.Z.zip"
                     ) from exc
                 import time
-                logger.warning("Attempt %d/%d failed, retrying in %ds...", attempt, MAX_RETRIES, RETRY_BACKOFF * attempt)
+                logger.warning(
+                    "Attempt %d/%d failed, retrying in %ds...", attempt, MAX_RETRIES, RETRY_BACKOFF * attempt
+                )
                 time.sleep(RETRY_BACKOFF * attempt)
 
+        assert resp is not None
         match = re.search(BEDROCK_URL_PATTERN, resp.text)
         if not match:
             raise RuntimeError(
@@ -140,7 +142,7 @@ class BedrockDownloader:
         logger.info("Server version %s installed at %s", version, dest_dir)
         return dest_dir
 
-    def get_installed_version(self, server_path: Path) -> Optional[str]:
+    def get_installed_version(self, server_path: Path) -> str | None:
         version_file = server_path / VERSION_FILE_NAME
         if version_file.exists():
             return version_file.read_text().strip()
@@ -150,6 +152,7 @@ class BedrockDownloader:
 
     def _download_zip(self, url: str, version: str) -> Path:
         logger.info("Downloading Bedrock server %s ...", version)
+        resp: requests.Response | None = None
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 resp = self._session.get(url, stream=True, timeout=DOWNLOAD_TIMEOUT)
@@ -161,21 +164,21 @@ class BedrockDownloader:
                 import time
                 time.sleep(RETRY_BACKOFF * attempt)
 
+        assert resp is not None
         total = int(resp.headers.get("content-length", 0))
         zip_path = self._cache / f"bedrock-server-{version}.zip"
         tmp_path = zip_path.with_suffix(".tmp")
 
-        with tmp_path.open("wb") as f:
-            with tqdm(
-                total=total,
-                unit="B",
-                unit_scale=True,
-                unit_divisor=1024,
-                desc=f"bedrock-server-{version}.zip",
-            ) as bar:
-                for chunk in resp.iter_content(DOWNLOAD_CHUNK_SIZE):
-                    f.write(chunk)
-                    bar.update(len(chunk))
+        with tmp_path.open("wb") as f, tqdm(
+            total=total,
+            unit="B",
+            unit_scale=True,
+            unit_divisor=1024,
+            desc=f"bedrock-server-{version}.zip",
+        ) as bar:
+            for chunk in resp.iter_content(DOWNLOAD_CHUNK_SIZE):
+                f.write(chunk)
+                bar.update(len(chunk))
 
         tmp_path.rename(zip_path)
         logger.debug("Cached zip at %s", zip_path)
@@ -187,6 +190,6 @@ class BedrockDownloader:
             for member in tqdm(members, desc="Extracting", unit="file"):
                 zf.extract(member, dest_dir)
 
-    def _get_cached_zip(self, version: str) -> Optional[Path]:
+    def _get_cached_zip(self, version: str) -> Path | None:
         path = self._cache / f"bedrock-server-{version}.zip"
         return path if path.exists() else None

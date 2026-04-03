@@ -3,6 +3,7 @@ and serves an IPC socket for CLI/TUI commands."""
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -12,7 +13,6 @@ import threading
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional
 
 import schedule
 
@@ -21,7 +21,6 @@ from src.backup_manager import BackupManager
 from src.downloader import BedrockDownloader
 from src.process_manager import ProcessManager
 from src.registry import ServerRegistry
-from src.server_instance import ServerInstance
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +41,7 @@ class DaemonScheduler:
         self._bm = BackupManager()
         self._stop = False
         # Maps server name → open PTY master fd (owned by daemon, used by relay threads)
-        self._master_fds: Dict[str, int] = {}
+        self._master_fds: dict[str, int] = {}
         self._lock = threading.Lock()
 
     # -------------------------------------------------------------------------
@@ -140,10 +139,8 @@ class DaemonScheduler:
         with self._lock:
             old = self._master_fds.pop(server_name, None)
             if old is not None:
-                try:
+                with contextlib.suppress(OSError):
                     os.close(old)
-                except OSError:
-                    pass
             self._master_fds[server_name] = master_fd
         t = threading.Thread(
             target=self._relay_loop,
@@ -170,10 +167,8 @@ class DaemonScheduler:
         with self._lock:
             if self._master_fds.get(server_name) == master_fd:
                 self._master_fds.pop(server_name, None)
-        try:
+        with contextlib.suppress(OSError):
             os.close(master_fd)
-        except OSError:
-            pass
         logger.info("Relay thread for '%s' exited", server_name)
 
     # -------------------------------------------------------------------------
@@ -193,7 +188,7 @@ class DaemonScheduler:
                 while not self._stop:
                     try:
                         conn, _ = srv.accept()
-                    except socket.timeout:
+                    except TimeoutError:
                         continue
                     threading.Thread(
                         target=self._handle_ipc_conn,
@@ -219,10 +214,8 @@ class DaemonScheduler:
                 conn.sendall((json.dumps(resp) + "\n").encode())
         except Exception as exc:
             logger.error("IPC handler error: %s", exc)
-            try:
+            with contextlib.suppress(Exception):
                 conn.sendall((json.dumps({"ok": False, "error": str(exc)}) + "\n").encode())
-            except Exception:
-                pass
 
     def _dispatch_ipc(self, req: dict) -> dict:
         action = req.get("action", "")
@@ -329,7 +322,7 @@ class DaemonScheduler:
 # Helpers for CLI commands
 # -------------------------------------------------------------------------
 
-def get_daemon_pid() -> Optional[int]:
+def get_daemon_pid() -> int | None:
     """Return the daemon PID if it's running, else None."""
     if not DAEMON_PID_FILE.exists():
         return None

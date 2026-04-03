@@ -3,7 +3,6 @@
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from src.server_instance import ServerInstance
 
@@ -18,19 +17,19 @@ class ServerRegistry:
     def _ensure_config_dir(self) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
 
-    def load(self) -> Dict[str, dict]:
+    def load(self) -> dict[str, dict]:
         if not self._path.exists():
             return {}
         with self._path.open() as f:
             return json.load(f)
 
-    def save(self, data: Dict[str, dict]) -> None:
+    def save(self, data: dict[str, dict]) -> None:
         self._ensure_config_dir()
         with self._path.open("w") as f:
             json.dump(data, f, indent=2)
         logger.debug("Registry saved to %s", self._path)
 
-    def get_server(self, name: str) -> Optional[ServerInstance]:
+    def get_server(self, name: str) -> ServerInstance | None:
         data = self.load()
         entry = data.get(name)
         if entry is None:
@@ -60,7 +59,7 @@ class ServerRegistry:
         self.save(data)
         logger.info("Removed server '%s' from registry", name)
 
-    def list_servers(self) -> List[ServerInstance]:
+    def list_servers(self) -> list[ServerInstance]:
         data = self.load()
         return [ServerInstance.from_dict(entry) for entry in data.values()]
 

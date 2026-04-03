@@ -3,14 +3,14 @@ from __future__ import annotations
 
 import json
 import socket
-from typing import Any, Dict
+from typing import Any
 
 import config
 
 SOCKET_TIMEOUT = 60.0  # generous: start can take up to STARTUP_TIMEOUT seconds
 
 
-def request(action: str, **kwargs: Any) -> Dict[str, Any]:
+def request(action: str, **kwargs: Any) -> dict[str, Any]:
     """Send a request to the daemon and return the parsed response.
 
     Raises RuntimeError if the daemon is not running or the action fails.
@@ -31,11 +31,9 @@ def request(action: str, **kwargs: Any) -> Dict[str, Any]:
                     break
         resp = json.loads(buf.decode().strip())
     except FileNotFoundError:
-        raise RuntimeError(
-            "Daemon is not running. Start it with: minectl daemon start"
-        )
+        raise RuntimeError("Daemon is not running. Start it with: minectl daemon start") from None
     except (ConnectionRefusedError, OSError) as exc:
-        raise RuntimeError(f"Cannot connect to daemon: {exc}")
+        raise RuntimeError(f"Cannot connect to daemon: {exc}") from exc
 
     if not resp.get("ok"):
         raise RuntimeError(resp.get("error", "Unknown daemon error"))

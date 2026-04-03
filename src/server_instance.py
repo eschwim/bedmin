@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from config import (
     BACKUP_DIR_NAME,
+    DEFAULT_PORT,
+    MAX_BACKUPS_DEFAULT,
     PID_FILENAME,
     SERVER_LOG_NAME,
     STDIN_FIFO_NAME,
     VERSION_FILE_NAME,
-    MAX_BACKUPS_DEFAULT,
-    DEFAULT_PORT,
 )
 
 
@@ -34,7 +34,7 @@ class ServerInstance:
     # --- Serialization ---
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ServerInstance":
+    def from_dict(cls, data: dict[str, Any]) -> ServerInstance:
         return cls(
             name=data["name"],
             path=Path(data["path"]),
@@ -49,7 +49,7 @@ class ServerInstance:
             update_interval_hours=data.get("update_interval_hours", 168),
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "path": str(self.path),

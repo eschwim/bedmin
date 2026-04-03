@@ -4,8 +4,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
-from zipfile import ZipFile, ZIP_DEFLATED
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from tqdm import tqdm
 
@@ -37,8 +36,8 @@ class BackupManager:
         filename += ".zip"
         zip_path = server.backup_dir / filename
 
-        included: List[str] = []
-        all_files: List[Path] = []
+        included: list[str] = []
+        all_files: list[Path] = []
         for target_name in _BACKUP_TARGETS:
             target = server.path / target_name
             if target.is_dir():
@@ -87,7 +86,7 @@ class BackupManager:
 
         logger.info("Restore complete.")
 
-    def list_backups(self, server: ServerInstance) -> List[Dict]:
+    def list_backups(self, server: ServerInstance) -> list[dict]:
         """Return list of backup info dicts, sorted newest-first."""
         if not server.backup_dir.exists():
             return []
@@ -117,7 +116,7 @@ class BackupManager:
                 logger.info("Pruning old backup: %s", old["filename"])
                 Path(old["path"]).unlink(missing_ok=True)
 
-    def _read_backup_info(self, zip_path: Path) -> Dict:
+    def _read_backup_info(self, zip_path: Path) -> dict:
         size_mb = round(zip_path.stat().st_size / (1024 * 1024), 2)
         info = {
             "filename": zip_path.name,

@@ -1,5 +1,6 @@
 """ProcessManager: start, stop, and send commands to Bedrock server processes."""
 
+import contextlib
 import logging
 import os
 import pty
@@ -7,7 +8,6 @@ import signal
 import subprocess
 import time
 from pathlib import Path
-from typing import Dict, Optional, Tuple
 
 from config import (
     SHUTDOWN_TIMEOUT,
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class ProcessManager:
-    def start(self, server: ServerInstance) -> Tuple[int, int]:
+    def start(self, server: ServerInstance) -> tuple[int, int]:
         """
         Launch the server process under a PTY.
         Returns (pid, master_fd). The caller owns master_fd and must close it
@@ -56,15 +56,11 @@ class ProcessManager:
         logger.info("Started server '%s' (PID %d)", server.name, proc.pid)
 
         if not self._wait_for_startup(server):
-            try:
+            with contextlib.suppress(ProcessLookupError):
                 proc.kill()
-            except ProcessLookupError:
-                pass
             self._clear_pid(server)
-            try:
+            with contextlib.suppress(OSError):
                 os.close(master_fd)
-            except OSError:
-                pass
             raise RuntimeError(
                 f"Server '{server.name}' did not report 'Server started' within {STARTUP_TIMEOUT}s. "
                 f"Check logs: {server.log_file}"
@@ -94,16 +90,14 @@ class ProcessManager:
             time.sleep(0.5)
         else:
             logger.warning("Server '%s' did not stop in %ds; sending SIGKILL", server.name, SHUTDOWN_TIMEOUT)
-            try:
+            with contextlib.suppress(ProcessLookupError):
                 os.kill(pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
 
         self._clear_pid(server)
         self._remove_fifo(server)
         logger.info("Server '%s' stopped", server.name)
 
-    def status(self, server: ServerInstance) -> Dict:
+    def status(self, server: ServerInstance) -> dict:
         """Return runtime status dict."""
         pid = self.get_pid(server)
         if pid is None:
@@ -128,7 +122,7 @@ class ProcessManager:
             f.write(command + "\n")
         logger.debug("Sent command to '%s': %s", server.name, command)
 
-    def get_pid(self, server: ServerInstance) -> Optional[int]:
+    def get_pid(self, server: ServerInstance) -> int | None:
         if not server.pid_file.exists():
             return None
         try:
@@ -149,10 +143,8 @@ class ProcessManager:
 
     def _remove_fifo(self, server: ServerInstance) -> None:
         if server.stdin_fifo.exists():
-            try:
+            with contextlib.suppress(OSError):
                 server.stdin_fifo.unlink()
-            except OSError:
-                pass
 
     def _write_pid(self, server: ServerInstance, pid: int) -> None:
         server.pid_file.write_text(str(pid))
@@ -175,7 +167,7 @@ class ProcessManager:
             time.sleep(STARTUP_POLL_INTERVAL)
         return False
 
-    def _get_uptime(self, pid: int) -> Optional[int]:
+    def _get_uptime(self, pid: int) -> int | None:
         try:
             stat_path = Path(f"/proc/{pid}/stat")
             stat_data = stat_path.read_text().split()
@@ -189,7 +181,7 @@ class ProcessManager:
         except (OSError, IndexError, ValueError):
             return None
 
-    def _get_memory_mb(self, pid: int) -> Optional[float]:
+    def _get_memory_mb(self, pid: int) -> float | None:
         try:
             status = Path(f"/proc/{pid}/status").read_text()
             for line in status.splitlines():

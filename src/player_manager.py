@@ -4,7 +4,6 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from src.server_instance import ServerInstance
 
@@ -47,7 +46,7 @@ class PlayerManager:
         self._write_json(server.whitelist_file, entries)
         logger.info("Removed '%s' from whitelist for server '%s'", player_name, server.name)
 
-    def whitelist_list(self, server: ServerInstance) -> List[Dict]:
+    def whitelist_list(self, server: ServerInstance) -> list[dict]:
         return self._read_json(server.whitelist_file)
 
     def whitelist_enable(self, server: ServerInstance) -> None:
@@ -81,12 +80,12 @@ class PlayerManager:
         self._write_json(server.permissions_file, entries)
         logger.info("Set permissions for xuid %s (%s) to '%s'", xuid, player_name, level)
 
-    def permissions_list(self, server: ServerInstance) -> List[Dict]:
+    def permissions_list(self, server: ServerInstance) -> list[dict]:
         return self._read_json(server.permissions_file)
 
     # --- Online Players (log parsing) ---
 
-    def get_online_players(self, server: ServerInstance) -> List[str]:
+    def get_online_players(self, server: ServerInstance) -> list[str]:
         """
         Parse the server log to determine which players are currently online.
         Scans the entire log and tracks connect/disconnect events.
@@ -94,7 +93,7 @@ class PlayerManager:
         if not server.log_file.exists():
             return []
 
-        online: Dict[str, str] = {}  # xuid -> name
+        online: dict[str, str] = {}  # xuid -> name
         for line in server.log_file.read_text().splitlines():
             match = _CONNECTED.search(line)
             if match:
@@ -108,7 +107,7 @@ class PlayerManager:
 
     # --- Private Helpers ---
 
-    def _read_json(self, path: Path) -> List[Dict]:
+    def _read_json(self, path: Path) -> list[dict]:
         if not path.exists():
             return []
         try:
@@ -117,7 +116,7 @@ class PlayerManager:
             logger.warning("Could not read %s: %s", path, exc)
             return []
 
-    def _write_json(self, path: Path, data: List[Dict]) -> None:
+    def _write_json(self, path: Path, data: list[dict]) -> None:
         path.write_text(json.dumps(data, indent=2))
 
     def _set_server_property(self, server: ServerInstance, key: str, value: str) -> None:

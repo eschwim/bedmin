@@ -3,9 +3,6 @@
 import logging
 import re
 import subprocess
-import sys
-from pathlib import Path
-from typing import List
 
 from src.server_instance import ServerInstance
 
@@ -48,6 +45,7 @@ class LogManager:
             stderr=subprocess.DEVNULL,
             text=True,
         )
+        assert proc.stdout is not None
         try:
             print(f"Following logs for '{server.name}' — press Ctrl-C to stop\n")
             for line in proc.stdout:
@@ -57,7 +55,7 @@ class LogManager:
         finally:
             proc.terminate()
 
-    def search(self, server: ServerInstance, pattern: str, last_n_lines: int = 0) -> List[str]:
+    def search(self, server: ServerInstance, pattern: str, last_n_lines: int = 0) -> list[str]:
         """Return lines matching pattern from the server log."""
         if not server.log_file.exists():
             return []
