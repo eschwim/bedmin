@@ -36,12 +36,12 @@ info "Project directory: $SCRIPT_DIR"
 hdr "Checking prerequisites"
 
 PYTHON=""
-for cmd in python3.12 python3.11 python3.10 python3; do
+for cmd in python3.12 python3.11 python3; do
     if command -v "$cmd" &>/dev/null; then
         ver=$("$cmd" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
         major="${ver%%.*}"
         minor="${ver##*.}"
-        if [[ "$major" -ge 3 && "$minor" -ge 10 ]]; then
+        if [[ "$major" -ge 3 && "$minor" -ge 11 ]]; then
             PYTHON="$cmd"
             break
         fi
@@ -49,7 +49,7 @@ for cmd in python3.12 python3.11 python3.10 python3; do
 done
 
 if [[ -z "$PYTHON" ]]; then
-    err "Python 3.10 or higher is required but was not found."
+    err "Python 3.11 or higher is required but was not found."
     err "Install it via your package manager, e.g.: sudo apt install python3.12"
     exit 1
 fi
@@ -89,8 +89,8 @@ PYTHON_VENV="$VENV_DIR/bin/python"
 # ---------------------------------------------------------------------------
 hdr "Installing dependencies"
 
-info "Installing from requirements.txt ..."
-"$PIP" install --quiet -r "$SCRIPT_DIR/requirements.txt"
+info "Installing dependencies from pyproject.toml ..."
+"$PIP" install --quiet "$SCRIPT_DIR[dev]" 2>/dev/null || "$PIP" install --quiet "$SCRIPT_DIR"
 ok "Dependencies installed."
 
 # ---------------------------------------------------------------------------
@@ -194,7 +194,7 @@ echo -e "
 
     minectl --help                            CLI reference
     minectl-tui                               Interactive TUI
-    minectl server create --name NAME         Add a server
+    minectl server create NAME                Add a server
     minectl daemon install --start            Install scheduler
 
   ${BOLD}Reload your shell now:${RESET}
