@@ -1,14 +1,14 @@
-"""Central configuration for minectl. All constants and default values live here."""
+"""Central configuration for bedmin. All constants and default values live here."""
 
 from pathlib import Path
 
 # --- Paths ---
-CONFIG_DIR = Path.home() / ".config" / "minectl"
+CONFIG_DIR = Path.home() / ".config" / "bedmin"
 REGISTRY_FILE = CONFIG_DIR / "servers.json"
 DEFAULT_SERVERS_DIR = Path.home() / "mc-servers"
 CACHE_DIR = CONFIG_DIR / "cache"
 LOG_DIR = CONFIG_DIR / "logs"
-MANAGER_LOG_FILE = LOG_DIR / "minectl.log"
+MANAGER_LOG_FILE = LOG_DIR / "bedmin.log"
 DAEMON_SOCKET = CONFIG_DIR / "daemon.sock"
 
 # --- Mojang Download ---

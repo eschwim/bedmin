@@ -1,4 +1,4 @@
-"""minectl TUI — Textual-based interactive server manager."""
+"""bedmin TUI — Textual-based interactive server manager."""
 
 from __future__ import annotations
 
@@ -1042,10 +1042,10 @@ class ServerPanel(Widget):
 # Main application
 # ---------------------------------------------------------------------------
 
-class MinectlApp(App):
-    """minectl TUI — Minecraft Bedrock server manager."""
+class BedminApp(App):
+    """bedmin TUI — Minecraft Bedrock server manager."""
 
-    TITLE = "minectl"
+    TITLE = "bedmin"
     SUB_TITLE = "Minecraft Bedrock Server Manager"
 
     CSS = """
@@ -1449,7 +1449,7 @@ PlayerInputModal, ConfirmModal {
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    MinectlApp().run()
+    BedminApp().run()
 
 
 if __name__ == "__main__":

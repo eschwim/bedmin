@@ -1,4 +1,4 @@
-"""minectl: Minecraft Bedrock server manager CLI."""
+"""bedmin: Minecraft Bedrock server manager CLI."""
 
 import json
 import os
@@ -143,7 +143,7 @@ def server_list(as_json: bool) -> None:
     """List all registered servers."""
     servers = _registry().list_servers()
     if not servers:
-        _info("No servers registered. Use 'minectl server create NAME' to add one.")
+        _info("No servers registered. Use 'bedmin server create NAME' to add one.")
         return
 
     pm = _process_manager()
@@ -697,7 +697,7 @@ def permissions_list(name: str) -> None:
 
 @cli.group()
 def daemon() -> None:
-    """Manage the minectl background scheduler daemon."""
+    """Manage the bedmin background scheduler daemon."""
 
 
 @daemon.command("start")
@@ -765,7 +765,7 @@ def daemon_status() -> None:
     scheduled = [s for s in servers if s.auto_backup or s.auto_update]
     if not scheduled:
         _info("  No servers have auto-backup or auto-update enabled.")
-        _info("  Use 'minectl server configure NAME --auto-backup' to enable.")
+        _info("  Use 'bedmin server configure NAME --auto-backup' to enable.")
         return
 
     _info(f"\n  {'SERVER':<20} {'BACKUP':<20} {'UPDATE'}")
@@ -786,7 +786,7 @@ def daemon_run() -> None:
         sys.exit(1)
 
     setup_logging(config.MANAGER_LOG_FILE, level=config.LOG_LEVEL)
-    _info("Starting minectl scheduler (foreground mode). Press Ctrl-C to stop.")
+    _info("Starting bedmin scheduler (foreground mode). Press Ctrl-C to stop.")
     from src.scheduler import DaemonScheduler
     DaemonScheduler().run()
 
@@ -801,19 +801,19 @@ def daemon_install(enable: bool, start: bool) -> None:
     import shutil
     import subprocess as _sp
 
-    minectl_bin = shutil.which("minectl") or str(Path(sys.argv[0]).resolve())
+    bedmin_bin = shutil.which("bedmin") or str(Path(sys.argv[0]).resolve())
 
     unit_dir = Path.home() / ".config" / "systemd" / "user"
-    unit_path = unit_dir / "minectl.service"
+    unit_path = unit_dir / "bedmin.service"
 
     unit_content = f"""\
 [Unit]
-Description=minectl Minecraft Bedrock server scheduler
+Description=bedmin Minecraft Bedrock server scheduler
 After=network.target
 
 [Service]
 Type=simple
-ExecStart={minectl_bin} daemon run
+ExecStart={bedmin_bin} daemon run
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal
@@ -834,23 +834,23 @@ WantedBy=default.target
     _info("Reloaded systemd user daemon.")
 
     if enable:
-        result = _sp.run(["systemctl", "--user", "enable", "minectl"], capture_output=True, text=True)
+        result = _sp.run(["systemctl", "--user", "enable", "bedmin"], capture_output=True, text=True)
         if result.returncode != 0:
             _err(f"systemctl enable failed: {result.stderr.strip()}")
             sys.exit(1)
         _ok("Service enabled (will start automatically on login).")
 
     if start:
-        result = _sp.run(["systemctl", "--user", "start", "minectl"], capture_output=True, text=True)
+        result = _sp.run(["systemctl", "--user", "start", "bedmin"], capture_output=True, text=True)
         if result.returncode != 0:
             _err(f"systemctl start failed: {result.stderr.strip()}")
             sys.exit(1)
         _ok("Service started.")
-        _info("  Check status: systemctl --user status minectl")
-        _info("  View logs:    journalctl --user -u minectl -f")
+        _info("  Check status: systemctl --user status bedmin")
+        _info("  View logs:    journalctl --user -u bedmin -f")
     else:
-        _info("\nTo start now:  systemctl --user start minectl")
-        _info("To view logs:  journalctl --user -u minectl -f")
+        _info("\nTo start now:  systemctl --user start bedmin")
+        _info("To view logs:  journalctl --user -u bedmin -f")
 
 
 @daemon.command("uninstall")
@@ -859,17 +859,17 @@ def daemon_uninstall(yes: bool) -> None:
     """Stop, disable, and remove the systemd user service."""
     import subprocess as _sp
 
-    unit_path = Path.home() / ".config" / "systemd" / "user" / "minectl.service"
+    unit_path = Path.home() / ".config" / "systemd" / "user" / "bedmin.service"
     if not unit_path.exists():
         _err("Service file not found — daemon may not be installed.")
         sys.exit(1)
 
     if not yes:
-        click.confirm("Stop, disable, and remove the minectl systemd service?", abort=True)
+        click.confirm("Stop, disable, and remove the bedmin systemd service?", abort=True)
 
     for cmd in [
-        ["systemctl", "--user", "stop",    "minectl"],
-        ["systemctl", "--user", "disable", "minectl"],
+        ["systemctl", "--user", "stop",    "bedmin"],
+        ["systemctl", "--user", "disable", "bedmin"],
     ]:
         _sp.run(cmd, capture_output=True)
 

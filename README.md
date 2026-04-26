@@ -1,4 +1,4 @@
-# minectl
+# bedmin
 
 A command-line manager for [Minecraft Bedrock Dedicated Server](https://www.minecraft.net/en-us/download/server/bedrock) on Linux. Handles downloading, running, updating, backing up, and scheduling servers, with both a CLI and an interactive TUI.
 
@@ -22,12 +22,12 @@ A command-line manager for [Minecraft Bedrock Dedicated Server](https://www.mine
 ## Installation
 
 ```bash
-git clone <repo-url> minectl
-cd minectl
+git clone <repo-url> bedmin
+cd bedmin
 ./setup.sh
 ```
 
-`setup.sh` creates a virtualenv, installs dependencies, adds `minectl` and `minectl-tui` to your `PATH`, and optionally installs the systemd service.
+`setup.sh` creates a virtualenv, installs dependencies, adds `bedmin` and `bedmin-tui` to your `PATH`, and optionally installs the systemd service.
 
 To install manually:
 
@@ -41,23 +41,23 @@ pip install -e .
 
 ```bash
 # Start the daemon (required before managing servers)
-minectl daemon start
+bedmin daemon start
 
 # Create and start a server
-minectl server create myserver --port 19132
-minectl start myserver
+bedmin server create myserver --port 19132
+bedmin start myserver
 
 # Check status
-minectl status
+bedmin status
 
 # Follow logs
-minectl logs myserver --follow
+bedmin logs myserver --follow
 
 # Send a console command
-minectl run myserver "list"
+bedmin run myserver "list"
 
 # Open the TUI
-minectl-tui
+bedmin-tui
 ```
 
 ## The Daemon
@@ -66,29 +66,29 @@ All server lifecycle operations (start, stop, restart, run) go through the daemo
 
 - Keeps servers running via PTY-based stdin so Bedrock's console accepts commands
 - Runs scheduled auto-backups and auto-updates
-- Exposes a Unix socket (`~/.config/minectl/daemon.sock`) for CLI and TUI communication
+- Exposes a Unix socket (`~/.config/bedmin/daemon.sock`) for CLI and TUI communication
 
 ```bash
-minectl daemon start          # Start in background
-minectl daemon stop           # Stop
-minectl daemon status         # Show status and scheduled jobs
-minectl daemon install --start  # Install as systemd user service and start
+bedmin daemon start          # Start in background
+bedmin daemon stop           # Stop
+bedmin daemon status         # Show status and scheduled jobs
+bedmin daemon install --start  # Install as systemd user service and start
 ```
 
-Without the daemon running, `minectl start`, `stop`, `restart`, and `run` will fail with a clear error.
+Without the daemon running, `bedmin start`, `stop`, `restart`, and `run` will fail with a clear error.
 
 ### systemd
 
 For the daemon to survive reboots and log-outs (with lingering enabled):
 
 ```bash
-minectl daemon install --start
+bedmin daemon install --start
 ```
 
-This writes `~/.config/systemd/user/minectl.service` and enables it. View logs with:
+This writes `~/.config/systemd/user/bedmin.service` and enables it. View logs with:
 
 ```bash
-journalctl --user -u minectl -f
+journalctl --user -u bedmin -f
 ```
 
 ## CLI Reference
@@ -96,11 +96,11 @@ journalctl --user -u minectl -f
 ### Server management
 
 ```bash
-minectl server create NAME [--port PORT] [--version VER] [--url URL] [--path DIR]
-minectl server list
-minectl server info NAME
-minectl server configure NAME [OPTIONS]   # show or change per-server settings
-minectl server delete NAME [--stop] [--yes] [--keep-files]
+bedmin server create NAME [--port PORT] [--version VER] [--url URL] [--path DIR]
+bedmin server list
+bedmin server info NAME
+bedmin server configure NAME [OPTIONS]   # show or change per-server settings
+bedmin server delete NAME [--stop] [--yes] [--keep-files]
 ```
 
 `server configure` options:
@@ -117,30 +117,30 @@ minectl server delete NAME [--stop] [--yes] [--keep-files]
 ### Lifecycle
 
 ```bash
-minectl start NAME
-minectl stop NAME [--force]    # --force sends SIGKILL instead of SIGTERM
-minectl restart NAME
-minectl status [NAME] [--json]
+bedmin start NAME
+bedmin stop NAME [--force]    # --force sends SIGKILL instead of SIGTERM
+bedmin restart NAME
+bedmin status [NAME] [--json]
 ```
 
 ### Logs
 
 ```bash
-minectl logs NAME              # Show last 50 lines
-minectl logs NAME -n 200       # Show last N lines
-minectl logs NAME --follow     # Stream in real time
-minectl logs NAME --search PATTERN
+bedmin logs NAME              # Show last 50 lines
+bedmin logs NAME -n 200       # Show last N lines
+bedmin logs NAME --follow     # Stream in real time
+bedmin logs NAME --search PATTERN
 ```
 
 ### Console commands
 
 ```bash
-minectl run NAME "COMMAND"
+bedmin run NAME "COMMAND"
 
 # Examples
-minectl run myserver "list"
-minectl run myserver "say Hello everyone"
-minectl run myserver "op PlayerName"
+bedmin run myserver "list"
+bedmin run myserver "say Hello everyone"
+bedmin run myserver "op PlayerName"
 ```
 
 The command is forwarded to the server's stdin via the daemon's relay thread and executed immediately. Responses appear in the server log.
@@ -148,9 +148,9 @@ The command is forwarded to the server's stdin via the daemon's relay thread and
 ### Updates
 
 ```bash
-minectl update NAME                      # Update to latest
-minectl update NAME --version 1.21.0.3  # Pin to specific version
-minectl update NAME --backup-first       # Backup before updating
+bedmin update NAME                      # Update to latest
+bedmin update NAME --version 1.21.0.3  # Pin to specific version
+bedmin update NAME --backup-first       # Backup before updating
 ```
 
 The server is stopped, updated, and restarted automatically if it was running.
@@ -160,33 +160,33 @@ The server is stopped, updated, and restarted automatically if it was running.
 Backups are stored in `<server-dir>/backups/` as timestamped zip files.
 
 ```bash
-minectl backup create NAME [--label LABEL]
-minectl backup list NAME
-minectl backup restore NAME BACKUP_FILE [--yes]
-minectl backup delete NAME BACKUP_FILE [--yes]
+bedmin backup create NAME [--label LABEL]
+bedmin backup list NAME
+bedmin backup restore NAME BACKUP_FILE [--yes]
+bedmin backup delete NAME BACKUP_FILE [--yes]
 ```
 
 ### Players
 
 ```bash
-minectl players online NAME
+bedmin players online NAME
 
 # Whitelist
-minectl players whitelist add NAME PLAYER [--xuid XUID] [--ignore-limit]
-minectl players whitelist remove NAME PLAYER
-minectl players whitelist list NAME
-minectl players whitelist enable NAME
-minectl players whitelist disable NAME
+bedmin players whitelist add NAME PLAYER [--xuid XUID] [--ignore-limit]
+bedmin players whitelist remove NAME PLAYER
+bedmin players whitelist list NAME
+bedmin players whitelist enable NAME
+bedmin players whitelist disable NAME
 
 # Permissions (visitor / member / operator)
-minectl players permissions set NAME PLAYER --xuid XUID --level LEVEL
-minectl players permissions list NAME
+bedmin players permissions set NAME PLAYER --xuid XUID --level LEVEL
+bedmin players permissions list NAME
 ```
 
 ## TUI
 
 ```bash
-minectl-tui
+bedmin-tui
 ```
 
 ### Layout
@@ -223,14 +223,14 @@ minectl-tui
 
 ## Configuration
 
-All state is stored under `~/.config/minectl/`:
+All state is stored under `~/.config/bedmin/`:
 
 | Path | Contents |
 |---|---|
 | `servers.json` | Server registry |
 | `daemon.pid` | Daemon process ID |
 | `daemon.sock` | IPC socket |
-| `logs/minectl.log` | Daemon and CLI log |
+| `logs/bedmin.log` | Daemon and CLI log |
 | `cache/` | Cached server zip downloads |
 
 Server files are installed to `~/mc-servers/<name>/` by default (configurable with `--path` at creation time).
@@ -238,9 +238,9 @@ Server files are installed to `~/mc-servers/<name>/` by default (configurable wi
 ## Architecture
 
 ```
-minectl CLI ──┐
+bedmin CLI ──┐
               ├── Unix socket (JSON) ──▶ Daemon
-minectl-tui ──┘                            │
+bedmin-tui ──┘                            │
                                            ├── ProcessManager (start/stop/status)
                                            ├── Relay threads (FIFO → PTY master)
                                            ├── Backup scheduler

@@ -1,4 +1,4 @@
-"""IPC client: sends requests to the running minectl daemon via Unix socket."""
+"""IPC client: sends requests to the running bedmin daemon via Unix socket."""
 from __future__ import annotations
 
 import json
@@ -31,7 +31,7 @@ def request(action: str, **kwargs: Any) -> dict[str, Any]:
                     break
         resp = json.loads(buf.decode().strip())
     except FileNotFoundError:
-        raise RuntimeError("Daemon is not running. Start it with: minectl daemon start") from None
+        raise RuntimeError("Daemon is not running. Start it with: bedmin daemon start") from None
     except (ConnectionRefusedError, OSError) as exc:
         raise RuntimeError(f"Cannot connect to daemon: {exc}") from exc
 

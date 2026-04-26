@@ -54,7 +54,7 @@ class DaemonScheduler:
         signal.signal(signal.SIGTERM, self._handle_signal)
         signal.signal(signal.SIGINT, self._handle_signal)
 
-        logger.info("minectl daemon started (PID %d)", os.getpid())
+        logger.info("bedmin daemon started (PID %d)", os.getpid())
         self._reload_jobs()
         self._restart_stopped_servers()
 
@@ -73,7 +73,7 @@ class DaemonScheduler:
         finally:
             schedule.clear()
             self._clear_pid()
-            logger.info("minectl daemon stopped")
+            logger.info("bedmin daemon stopped")
 
     # -------------------------------------------------------------------------
     # Job management

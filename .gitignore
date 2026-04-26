@@ -43,3 +43,6 @@ pyrightconfig.json
 *.pid
 *.fifo
 relay.pid
+
+# Claude Code
+.claude/

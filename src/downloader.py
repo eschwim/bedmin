@@ -60,7 +60,7 @@ class BedrockDownloader:
                 "prop": "wikitext",
                 "format": "json",
             },
-            headers={"User-Agent": "minectl/1.0 (Linux)"},
+            headers={"User-Agent": "bedmin/1.0 (Linux)"},
             timeout=REQUEST_TIMEOUT,
         )
         resp.raise_for_status()
@@ -93,7 +93,7 @@ class BedrockDownloader:
                     raise RuntimeError(
                         f"Failed to fetch Mojang download page after {MAX_RETRIES} attempts: {exc}\n\n"
                         "Pass a direct URL to skip version detection:\n"
-                        "  minectl server create --name NAME "
+                        "  bedmin server create --name NAME "
                         "--url https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-X.Y.Z.zip"
                     ) from exc
                 import time

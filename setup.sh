@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# minectl setup — installs dependencies, configures PATH, and optionally
+# bedmin setup — installs dependencies, configures PATH, and optionally
 # installs the systemd user service for the scheduler daemon.
 # Safe to re-run; all steps are idempotent.
 
@@ -27,7 +27,7 @@ hdr()  { echo -e "\n${BOLD}$*${RESET}"; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-hdr "minectl setup"
+hdr "bedmin setup"
 info "Project directory: $SCRIPT_DIR"
 
 # ---------------------------------------------------------------------------
@@ -94,14 +94,14 @@ info "Installing dependencies from pyproject.toml ..."
 ok "Dependencies installed."
 
 # ---------------------------------------------------------------------------
-# 4. Install minectl package
+# 4. Install bedmin package
 # ---------------------------------------------------------------------------
-hdr "Installing minectl"
+hdr "Installing bedmin"
 
 "$PIP" install --quiet -e "$SCRIPT_DIR"
-ok "minectl installed."
-info "CLI:  $VENV_DIR/bin/minectl"
-info "TUI:  $VENV_DIR/bin/minectl-tui"
+ok "bedmin installed."
+info "CLI:  $VENV_DIR/bin/bedmin"
+info "TUI:  $VENV_DIR/bin/bedmin-tui"
 
 # ---------------------------------------------------------------------------
 # 5. Add venv/bin to PATH in shell config
@@ -110,7 +110,7 @@ hdr "Configuring PATH"
 
 BIN_DIR="$VENV_DIR/bin"
 PATH_LINE="export PATH=\"$BIN_DIR:\$PATH\""
-PATH_MARKER="# minectl"
+PATH_MARKER="# bedmin"
 
 # Detect which shell config files to update
 SHELL_CONFIGS=()
@@ -142,17 +142,17 @@ export PATH="$BIN_DIR:$PATH"
 # ---------------------------------------------------------------------------
 hdr "Verifying installation"
 
-if "$BIN_DIR/minectl" --help &>/dev/null; then
-    ok "minectl CLI works."
+if "$BIN_DIR/bedmin" --help &>/dev/null; then
+    ok "bedmin CLI works."
 else
-    err "minectl CLI check failed. Something went wrong."
+    err "bedmin CLI check failed. Something went wrong."
     exit 1
 fi
 
-if [[ -x "$BIN_DIR/minectl-tui" ]]; then
-    ok "minectl-tui installed."
+if [[ -x "$BIN_DIR/bedmin-tui" ]]; then
+    ok "bedmin-tui installed."
 else
-    warn "minectl-tui not found in $BIN_DIR."
+    warn "bedmin-tui not found in $BIN_DIR."
 fi
 
 # ---------------------------------------------------------------------------
@@ -160,13 +160,13 @@ fi
 # ---------------------------------------------------------------------------
 hdr "Systemd service"
 
-UNIT_PATH="$HOME/.config/systemd/user/minectl.service"
+UNIT_PATH="$HOME/.config/systemd/user/bedmin.service"
 
 if [[ "$SYSTEMD_AVAILABLE" != "true" ]]; then
     warn "Skipping systemd setup (user session not available)."
 elif [[ -f "$UNIT_PATH" ]]; then
     ok "Service already installed: $UNIT_PATH"
-    info "To reinstall:  minectl daemon uninstall && minectl daemon install --start"
+    info "To reinstall:  bedmin daemon uninstall && bedmin daemon install --start"
 else
     echo ""
     read -r -p "$(echo -e "${CYAN}?${RESET}  Install systemd user service for the scheduler daemon? [Y/n] ")" REPLY
@@ -176,12 +176,12 @@ else
         START_NOW="${START_NOW:-Y}"
 
         if [[ "$START_NOW" =~ ^[Yy]$ ]]; then
-            "$BIN_DIR/minectl" daemon install --start
+            "$BIN_DIR/bedmin" daemon install --start
         else
-            "$BIN_DIR/minectl" daemon install
+            "$BIN_DIR/bedmin" daemon install
         fi
     else
-        info "Skipped. To install later:  minectl daemon install --start"
+        info "Skipped. To install later:  bedmin daemon install --start"
     fi
 fi
 
@@ -192,10 +192,10 @@ hdr "Setup complete"
 echo -e "
   ${BOLD}Commands available after reloading your shell:${RESET}
 
-    minectl --help                            CLI reference
-    minectl-tui                               Interactive TUI
-    minectl server create NAME                Add a server
-    minectl daemon install --start            Install scheduler
+    bedmin --help                            CLI reference
+    bedmin-tui                               Interactive TUI
+    bedmin server create NAME                Add a server
+    bedmin daemon install --start            Install scheduler
 
   ${BOLD}Reload your shell now:${RESET}
 

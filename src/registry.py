@@ -67,5 +67,5 @@ class ServerRegistry:
         """Get a server or raise a clear error if not found."""
         server = self.get_server(name)
         if server is None:
-            raise KeyError(f"No server named '{name}'. Run 'minectl server list' to see available servers.")
+            raise KeyError(f"No server named '{name}'. Run 'bedmin server list' to see available servers.")
         return server
