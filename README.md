@@ -109,10 +109,11 @@ bedmin server delete NAME [--stop] [--yes] [--keep-files]
 |---|---|
 | `--auto-backup / --no-auto-backup` | Enable scheduled backups |
 | `--backup-interval HOURS` | Hours between backups (default: 24) |
-| `--max-backups N` | Maximum backups to keep (default: 10) |
 | `--auto-update / --no-auto-update` | Enable scheduled updates |
 | `--update-interval HOURS` | Hours between update checks (default: 168) |
 | `--port PORT` | Change the server port |
+
+Advanced backup options (`skip_unchanged_backup`, `retention_daily_days`, etc.) are set by editing `~/.config/bedmin/servers.json` directly — see [Backup retention](#backup-retention) below.
 
 ### Lifecycle
 
@@ -165,6 +166,26 @@ bedmin backup list NAME
 bedmin backup restore NAME BACKUP_FILE [--yes]
 bedmin backup delete NAME BACKUP_FILE [--yes]
 ```
+
+### Backup retention
+
+Retention and deduplication are configured per-server in `~/.config/bedmin/servers.json`.
+
+**Skip unchanged backups** — skip the backup if nothing has changed since the last one (based on file modification times and sizes):
+
+```json
+"skip_unchanged_backup": true
+```
+
+**Tiered retention** — keep all backups within a daily window, then one per week, then one per month. Backups beyond all windows are pruned automatically after each backup run:
+
+```json
+"retention_daily_days": 7,
+"retention_weekly_weeks": 4,
+"retention_monthly_months": 12
+```
+
+Any tier can be omitted or set to `0`. If `retention_daily_days` is `0` (the default), no automatic pruning occurs and backups accumulate until deleted manually.
 
 ### Players
 
@@ -234,6 +255,17 @@ All state is stored under `~/.config/bedmin/`:
 | `cache/` | Cached server zip downloads |
 
 Server files are installed to `~/mc-servers/<name>/` by default (configurable with `--path` at creation time).
+
+### servers.json fields
+
+Most fields are managed by the CLI, but the following are set by editing the file directly:
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `skip_unchanged_backup` | bool | `false` | Skip backup if nothing changed since the last one |
+| `retention_daily_days` | int | `0` | Keep all backups created within this many days |
+| `retention_weekly_weeks` | int | `0` | Beyond the daily window, keep one backup per week for this many weeks |
+| `retention_monthly_months` | int | `0` | Beyond the weekly window, keep one backup per month for this many months |
 
 ## Architecture
 
