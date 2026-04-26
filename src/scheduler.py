@@ -255,7 +255,10 @@ class DaemonScheduler:
         logger.info("Auto-backup starting for '%s'...", server_name)
         try:
             path = self._bm.create(server, label="auto")
-            logger.info("Auto-backup complete: %s", path.name)
+            if path is None:
+                logger.info("Auto-backup skipped for '%s': no changes since last backup", server_name)
+            else:
+                logger.info("Auto-backup complete: %s", path.name)
         except Exception as exc:
             logger.error("Auto-backup failed for '%s': %s", server_name, exc)
 
@@ -277,7 +280,7 @@ class DaemonScheduler:
             logger.info("Updating '%s': %s → %s", server_name, server.version, version)
 
             try:
-                bp = self._bm.create(server, label="pre-update")
+                bp = self._bm.create(server, label="pre-update", force=True)
                 logger.info("Pre-update backup created: %s", bp.name)
             except Exception as exc:
                 logger.warning("Pre-update backup failed (continuing anyway): %s", exc)

@@ -34,7 +34,6 @@ STARTUP_POLL_INTERVAL = 0.5  # seconds between log checks during startup
 
 # --- Defaults ---
 DEFAULT_PORT = 19132
-MAX_BACKUPS_DEFAULT = 10
 LOG_TAIL_LINES = 50
 
 # --- Network / Retry ---

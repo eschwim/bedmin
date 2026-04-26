@@ -28,6 +28,18 @@ def _registry() -> ServerRegistry:
     return ServerRegistry(config.REGISTRY_FILE)
 
 
+def _backup_retention_summary(s) -> str:
+    if s.retention_daily_days > 0:
+        parts = [f"{s.retention_daily_days}d daily"]
+        if s.retention_weekly_weeks:
+            parts.append(f"{s.retention_weekly_weeks}w weekly")
+        if s.retention_monthly_months:
+            parts.append(f"{s.retention_monthly_months}m monthly")
+        return ", ".join(parts)
+    return "no rotation (manual)"
+
+
+
 def _process_manager() -> ProcessManager:
     return ProcessManager()
 
@@ -178,7 +190,7 @@ def server_info(name: str) -> None:
     click.echo(f"  Port:      {s.port}")
     click.echo(f"  Created:   {s.created_at}")
     click.echo(f"  Updated:   {s.updated_at}")
-    click.echo(f"  Backups:   max {s.max_backups}")
+    click.echo(f"  Backups:   {_backup_retention_summary(s)}")
 
     if st["running"]:
         click.echo(f"\n  Status:    {click.style('RUNNING', fg='green')} (PID {st['pid']})")
@@ -231,7 +243,6 @@ def server_delete(name: str, do_stop: bool, yes: bool, keep_files: bool) -> None
 @click.argument("name")
 @click.option("--auto-backup/--no-auto-backup", default=None, help="Enable/disable scheduled backups.")
 @click.option("--backup-interval", type=int, default=None, metavar="HOURS", help="Hours between auto-backups.")
-@click.option("--max-backups", type=int, default=None, help="Maximum number of backups to keep.")
 @click.option("--auto-update/--no-auto-update", default=None, help="Enable/disable scheduled updates.")
 @click.option("--update-interval", type=int, default=None, metavar="HOURS", help="Hours between update checks.")
 @click.option("--port", type=int, default=None, help="Change the server port.")
@@ -239,7 +250,6 @@ def server_configure(
     name: str,
     auto_backup: bool | None,
     backup_interval: int | None,
-    max_backups: int | None,
     auto_update: bool | None,
     update_interval: int | None,
     port: int | None,
@@ -256,11 +266,6 @@ def server_configure(
             _err("--backup-interval must be at least 1 hour.")
             sys.exit(1)
         updates["backup_interval_hours"] = backup_interval
-    if max_backups is not None:
-        if max_backups < 1:
-            _err("--max-backups must be at least 1.")
-            sys.exit(1)
-        updates["max_backups"] = max_backups
     if auto_update is not None:
         updates["auto_update"] = auto_update
     if update_interval is not None:
@@ -273,10 +278,21 @@ def server_configure(
         _patch_port(s, port)
 
     if not updates:
+        tiered = s.retention_daily_days > 0
+        if tiered:
+            retention_str = (
+                f"{s.retention_daily_days}d daily"
+                + (f", {s.retention_weekly_weeks}w weekly" if s.retention_weekly_weeks else "")
+                + (f", {s.retention_monthly_months}m monthly" if s.retention_monthly_months else "")
+            )
         _info(click.style(f"\n  Schedule config for '{name}':", bold=True))
         _info(f"  Auto-backup:     {'enabled' if s.auto_backup else 'disabled'}")
         _info(f"  Backup interval: every {s.backup_interval_hours}h")
-        _info(f"  Max backups:     {s.max_backups}")
+        _info(f"  Skip unchanged:  {'yes' if s.skip_unchanged_backup else 'no'}")
+        if tiered:
+            _info(f"  Retention:       {retention_str}")
+        else:
+            _info(f"  Retention:       disabled (backups accumulate)")
         _info(f"  Auto-update:     {'enabled' if s.auto_update else 'disabled'}")
         _info(f"  Update interval: every {s.update_interval_hours}h")
         _info(f"  Port:            {s.port}\n")
@@ -496,7 +512,10 @@ def backup_create(name: str, label: str) -> None:
     """Create a backup of a server's world and config."""
     try:
         path = BackupManager().create(_require(name), label=label)
-        _ok(f"Backup created: {path}")
+        if path is None:
+            _info("Backup skipped: no changes since last backup.")
+        else:
+            _ok(f"Backup created: {path}")
     except Exception as exc:
         _err(str(exc))
         sys.exit(1)

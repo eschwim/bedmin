@@ -9,7 +9,6 @@ from typing import Any
 from config import (
     BACKUP_DIR_NAME,
     DEFAULT_PORT,
-    MAX_BACKUPS_DEFAULT,
     PID_FILENAME,
     SERVER_LOG_NAME,
     STDIN_FIFO_NAME,
@@ -27,7 +26,10 @@ class ServerInstance:
     updated_at: str = ""
     auto_backup: bool = False
     backup_interval_hours: int = 24
-    max_backups: int = MAX_BACKUPS_DEFAULT
+    skip_unchanged_backup: bool = False
+    retention_daily_days: int = 0
+    retention_weekly_weeks: int = 0
+    retention_monthly_months: int = 0
     auto_update: bool = False
     update_interval_hours: int = 168  # weekly
 
@@ -44,7 +46,10 @@ class ServerInstance:
             updated_at=data.get("updated_at", ""),
             auto_backup=data.get("auto_backup", False),
             backup_interval_hours=data.get("backup_interval_hours", 24),
-            max_backups=data.get("max_backups", MAX_BACKUPS_DEFAULT),
+            skip_unchanged_backup=data.get("skip_unchanged_backup", False),
+            retention_daily_days=data.get("retention_daily_days", 0),
+            retention_weekly_weeks=data.get("retention_weekly_weeks", 0),
+            retention_monthly_months=data.get("retention_monthly_months", 0),
             auto_update=data.get("auto_update", False),
             update_interval_hours=data.get("update_interval_hours", 168),
         )
@@ -59,7 +64,10 @@ class ServerInstance:
             "updated_at": self.updated_at,
             "auto_backup": self.auto_backup,
             "backup_interval_hours": self.backup_interval_hours,
-            "max_backups": self.max_backups,
+            "skip_unchanged_backup": self.skip_unchanged_backup,
+            "retention_daily_days": self.retention_daily_days,
+            "retention_weekly_weeks": self.retention_weekly_weeks,
+            "retention_monthly_months": self.retention_monthly_months,
             "auto_update": self.auto_update,
             "update_interval_hours": self.update_interval_hours,
         }

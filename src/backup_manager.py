@@ -1,8 +1,9 @@
 """BackupManager: zip-based backup and restore for server worlds and configs."""
 
+import hashlib
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
@@ -21,13 +22,25 @@ _BACKUP_TARGETS = ["worlds", "server.properties", "allowlist.json", "permissions
 
 
 class BackupManager:
-    def create(self, server: ServerInstance, label: str = "") -> Path:
+    def create(self, server: ServerInstance, label: str = "", force: bool = False) -> Path | None:
         """
         Create a zip backup of the server's world and config files.
-        Returns the path to the created zip file.
-        Prunes old backups afterward if count exceeds server.max_backups.
+        Returns the path to the created zip, or None if skipped (no changes).
+        Prunes old backups afterward according to the server's retention policy.
+        Pass force=True to bypass skip-if-unchanged (used for pre-update backups).
         """
         server.backup_dir.mkdir(parents=True, exist_ok=True)
+
+        fingerprint = ""
+        if server.skip_unchanged_backup:
+            fingerprint = self._compute_fingerprint(server)
+            if not force:
+                recent = self.list_backups(server)
+                if recent and recent[0].get("content_fingerprint") == fingerprint:
+                    logger.info(
+                        "Skipping backup for '%s': no changes since last backup", server.name
+                    )
+                    return None
 
         timestamp = datetime.now().strftime(BACKUP_TIMESTAMP_FORMAT)
         filename = f"{server.name}_{timestamp}"
@@ -53,11 +66,11 @@ class BackupManager:
             "created_at": datetime.now().isoformat(),
             "label": label,
             "included_paths": included,
+            "content_fingerprint": fingerprint,
         }
 
         logger.info("Creating backup: %s", zip_path)
         with ZipFile(zip_path, "w", ZIP_DEFLATED) as zf:
-            # Write metadata first
             zf.writestr(BACKUP_METADATA_NAME, json.dumps(metadata, indent=2))
             for file_path in tqdm(all_files, desc="Backing up", unit="file"):
                 if file_path.is_file():
@@ -108,13 +121,64 @@ class BackupManager:
     # --- Private ---
 
     def _prune_old_backups(self, server: ServerInstance) -> None:
-        """Delete oldest backups if count exceeds server.max_backups."""
+        if server.retention_daily_days > 0:
+            self._apply_tiered_retention(server)
+
+    def _apply_tiered_retention(self, server: ServerInstance) -> None:
+        """RRD-style bucketed pruning: daily window, then weekly, then monthly."""
         backups = self.list_backups(server)
-        excess = len(backups) - server.max_backups
-        if excess > 0:
-            for old in backups[-excess:]:  # oldest are at the end (list is newest-first)
-                logger.info("Pruning old backup: %s", old["filename"])
-                Path(old["path"]).unlink(missing_ok=True)
+        now = datetime.now()
+
+        daily_cutoff = now - timedelta(days=server.retention_daily_days)
+        weekly_cutoff = daily_cutoff - timedelta(weeks=server.retention_weekly_weeks)
+        monthly_cutoff = weekly_cutoff - timedelta(days=server.retention_monthly_months * 30)
+
+        to_keep: set[str] = set()
+        seen_weeks: set[tuple] = set()
+        seen_months: set[tuple] = set()
+
+        for b in backups:  # newest-first
+            if not b["created_at"]:
+                to_keep.add(b["filename"])  # unparseable timestamp — keep defensively
+                continue
+            dt = datetime.fromisoformat(b["created_at"])
+
+            if dt >= daily_cutoff:
+                to_keep.add(b["filename"])
+            elif dt >= weekly_cutoff:
+                key = dt.isocalendar()[:2]  # (year, week_number)
+                if key not in seen_weeks:
+                    seen_weeks.add(key)
+                    to_keep.add(b["filename"])
+            elif dt >= monthly_cutoff:
+                key = (dt.year, dt.month)
+                if key not in seen_months:
+                    seen_months.add(key)
+                    to_keep.add(b["filename"])
+            # beyond all windows: let it be pruned
+
+        for b in backups:
+            if b["filename"] not in to_keep:
+                logger.info("Pruning backup (tiered retention): %s", b["filename"])
+                Path(b["path"]).unlink(missing_ok=True)
+
+    def _compute_fingerprint(self, server: ServerInstance) -> str:
+        """SHA-256 of sorted 'relpath:mtime_ns:size' entries across all backup targets."""
+        h = hashlib.sha256()
+        entries: list[str] = []
+        for target_name in _BACKUP_TARGETS:
+            target = server.path / target_name
+            if target.is_dir():
+                for f in sorted(target.rglob("*")):
+                    if f.is_file():
+                        st = f.stat()
+                        entries.append(f"{f.relative_to(server.path)}:{st.st_mtime_ns}:{st.st_size}")
+            elif target.is_file():
+                st = target.stat()
+                entries.append(f"{target.name}:{st.st_mtime_ns}:{st.st_size}")
+        for entry in entries:
+            h.update(entry.encode())
+        return h.hexdigest()
 
     def _read_backup_info(self, zip_path: Path) -> dict:
         size_mb = round(zip_path.stat().st_size / (1024 * 1024), 2)
@@ -125,6 +189,7 @@ class BackupManager:
             "created_at": "",
             "label": "",
             "version": "",
+            "content_fingerprint": "",
         }
         try:
             with ZipFile(zip_path) as zf:
@@ -133,6 +198,7 @@ class BackupManager:
                     info["created_at"] = meta.get("created_at", "")
                     info["label"] = meta.get("label", "")
                     info["version"] = meta.get("server_version", "")
+                    info["content_fingerprint"] = meta.get("content_fingerprint", "")
         except Exception:
             pass
         return info
